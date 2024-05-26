@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WikiWizard Chat</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <video autoplay muted loop id="bg-video">
+        <source src="{{ url_for('static', filename='black.mp4') }}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    <div class="container chat-container">
+        <h1>WikiWizard Chat</h1>
+        <div id="chat-box">
+            <div id="chat-log"></div>
+            <div id="user-input">
+                <input type="text" id="user-query" placeholder="Enter your query">
+                <select id="language-select">
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="zh-cn">Chinese</option>
+                    <option value="hi">Hindi</option>
+                    <option value="te">Telugu</option>
+                    <!-- Add more languages here -->
+                    <option value="it">Italian</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                </select>
+                <button onclick="sendQuery()">Send</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        function sendQuery() {
+            const query = document.getElementById('user-query').value;
+            const language = document.getElementById('language-select').value;
+            if (query) {
+                fetch('/get_summary', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query, language: language }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        const chatLog = document.getElementById('chat-log');
+                        const userDiv = document.createElement('div');
+                        userDiv.className = 'chat-message user';
+                        userDiv.textContent = 'You: ' + query;
+                        chatLog.appendChild(userDiv);
+
+                        const botDiv = document.createElement('div');
+                        botDiv.className = 'chat-message bot';
+                        botDiv.textContent = 'WikiWizard: ' + data.summary;
+                        chatLog.appendChild(botDiv);
+
+                        document.getElementById('user-query').value = '';
+                    });
+            }
+        }
+    </script>
+</body>
+
+</html>
