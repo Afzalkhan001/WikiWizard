@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WikiWizard Chat</title>
+    <title>WikiWizard</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 
@@ -13,56 +13,129 @@
         <source src="{{ url_for('static', filename='black.mp4') }}" type="video/mp4">
         Your browser does not support the video tag.
     </video>
-    <div class="container chat-container">
+    <div class="container">
         <h1>WikiWizard Chat</h1>
-        <div id="chat-box">
-            <div id="chat-log"></div>
-            <div id="user-input">
-                <input type="text" id="user-query" placeholder="Enter your query">
-                <select id="language-select">
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
-                    <option value="zh-cn">Chinese</option>
-                    <option value="hi">Hindi</option>
-                    <option value="te">Telugu</option>
-                    <!-- Add more languages here -->
-                    <option value="it">Italian</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                </select>
-                <button onclick="sendQuery()">Send</button>
+        <div class="chat-container">
+            <div id="chat-box">
+                <div id="chat-log"></div>
+                <div id="user-input">
+                    <input type="text" id="user-query" placeholder="Type your query here..." />
+                    <select id="language-select">
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="hi">Hindi</option>
+                        <option value="te">Telugu</option>
+                        <option value="ko">Korean</option>
+                        <!-- Add more languages as needed -->
+                    </select>
+                    <button onclick="sendQuery()">Send</button>
+                    <button onclick="startVoiceRecognition()">🎤 Start Voice</button>
+                    <button onclick="stopVoiceRecognition()">🛑 Stop Voice</button>
+                    <button onclick="readOutLastResponse()">🔊 Read Out</button>
+                    <button onclick="stopReading()">🛑 Stop Read Out</button>
+                </div>
             </div>
         </div>
     </div>
+
     <script>
+        let recognition;
+        let isSpeaking = false;
+        let lastResponse = '';
+        let lastLanguage = 'en';
+
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = function () {
+                console.log('Voice recognition started.');
+            };
+
+            recognition.onresult = function (event) {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('user-query').value = transcript;
+                sendQuery();
+            };
+
+            recognition.onerror = function (event) {
+                console.error('Voice recognition error:', event.error);
+            };
+
+            recognition.onend = function () {
+                console.log('Voice recognition ended.');
+            };
+        }
+
+        function startVoiceRecognition() {
+            if (recognition) {
+                recognition.start();
+            }
+        }
+
+        function stopVoiceRecognition() {
+            if (recognition) {
+                recognition.stop();
+            }
+        }
+
         function sendQuery() {
             const query = document.getElementById('user-query').value;
             const language = document.getElementById('language-select').value;
-            if (query) {
-                fetch('/get_summary', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ query: query, language: language }),
+
+            fetch('/get_summary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: query, language: language }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const chatLog = document.getElementById('chat-log');
+                    const userMessage = document.createElement('div');
+                    userMessage.classList.add('chat-message', 'user');
+                    userMessage.textContent = query;
+                    chatLog.appendChild(userMessage);
+
+                    const botMessage = document.createElement('div');
+                    botMessage.classList.add('chat-message', 'bot');
+                    botMessage.innerHTML = `<p>${data.summary}</p>`;
+                    if (data.image_url) {
+                        botMessage.innerHTML += `<img src="${data.image_url}" alt="Image" style="max-width:100%;">`;
+                    }
+                    chatLog.appendChild(botMessage);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+
+                    lastResponse = data.summary;
+                    lastLanguage = language;
                 })
-                    .then(response => response.json())
-                    .then(data => {
-                        const chatLog = document.getElementById('chat-log');
-                        const userDiv = document.createElement('div');
-                        userDiv.className = 'chat-message user';
-                        userDiv.textContent = 'You: ' + query;
-                        chatLog.appendChild(userDiv);
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
 
-                        const botDiv = document.createElement('div');
-                        botDiv.className = 'chat-message bot';
-                        botDiv.textContent = 'WikiWizard: ' + data.summary;
-                        chatLog.appendChild(botDiv);
+        function readOutLastResponse() {
+            if (lastResponse && 'speechSynthesis' in window && !isSpeaking) {
+                const utterance = new SpeechSynthesisUtterance(lastResponse);
+                utterance.lang = document.getElementById('language-select').value;
+                utterance.onstart = function () {
+                    isSpeaking = true;
+                };
+                utterance.onend = function () {
+                    isSpeaking = false;
+                };
+                speechSynthesis.speak(utterance);
+            }
+        }
 
-                        document.getElementById('user-query').value = '';
-                    });
+        function stopReading() {
+            if (isSpeaking && 'speechSynthesis' in window) {
+                speechSynthesis.cancel();
+                isSpeaking = false;
             }
         }
     </script>
