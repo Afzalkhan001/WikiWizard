@@ -1,196 +1,144 @@
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    background-color: #000;
-}
+<!DOCTYPE html>
+<html lang="en">
 
-#bg-video {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    min-width: 100%;
-    min-height: 100%;
-    z-index: -1;
-    object-fit: cover;
-}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WikiWizard</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+</head>
 
-.container {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: 20px;
-    background-color: rgba(0, 0, 0, 0.6);
-    border-radius: 15px;
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-    color: #fff;
-    text-align: center;
-    animation: fadeIn 2s;
-}
+<body>
+    <video autoplay muted loop id="bg-video">
+        <source src="{{ url_for('static', filename='black.mp4') }}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    <div class="container">
+        <h1>WikiWizard Chat</h1>
+        <div class="chat-container">
+            <div id="chat-box">
+                <div id="chat-log"></div>
+                <div id="user-input">
+                    <input type="text" id="user-query" placeholder="Type your query here..." />
+                    <select id="language-select">
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="hi">Hindi</option>
+                        <option value="te">Telugu</option>
+                        <option value="ko">Korean</option>
+                        <!-- Add more languages as needed -->
+                    </select>
+                    <button onclick="sendQuery()">Send</button>
+                    <button onclick="startVoiceRecognition()">🎤 Start Voice</button>
+                    <button onclick="stopVoiceRecognition()">🛑 Stop Voice</button>
+                    <button onclick="readOutLastResponse()">🔊 Read Out</button>
+                    <button onclick="stopReading()">🛑 Stop Read Out</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-h1 {
-    margin: 0;
-    padding: 0;
-    font-size: 3rem;
-    color: #32CD32;
-}
+    <script>
+        let recognition;
+        let isSpeaking = false;
+        let lastResponse = '';
+        let lastLanguage = 'en';
 
-p {
-    font-size: 1.2rem;
-    margin-top: 10px;
-    margin-bottom: 30px;
-    color: #dcdcdc;
-}
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
 
-.button {
-    display: inline-block;
-    padding: 15px 25px;
-    margin-top: 20px;
-    background-color: #32CD32;
-    color: #fff;
-    border-radius: 5px;
-    text-decoration: none;
-    text-align: center;
-    cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.3s ease;
-}
+            recognition.onstart = function () {
+                console.log('Voice recognition started.');
+            };
 
-.button:hover {
-    background-color: #28a745;
-    transform: scale(1.1);
-}
+            recognition.onresult = function (event) {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('user-query').value = transcript;
+                sendQuery();
+            };
 
-.chat-container {
-    padding: 20px;
-    animation: fadeIn 2s;
-}
+            recognition.onerror = function (event) {
+                console.error('Voice recognition error:', event.error);
+            };
 
-#chat-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+            recognition.onend = function () {
+                console.log('Voice recognition ended.');
+            };
+        }
 
-#chat-log {
-    width: 100%;
-    max-width: 600px;
-    height: 600px;
-    overflow-y: scroll;
-    padding: 10px;
-    background-color: rgba(0, 0, 0, 0.6);
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    color: #fff;
-}
+        function startVoiceRecognition() {
+            if (recognition) {
+                recognition.start();
+            }
+        }
 
-.chat-message {
-    margin: 10px 0;
-    padding: 10px;
-    border-radius: 5px;
-    background-color: rgba(255, 255, 255, 0.1);
-    transition: transform 0.3s ease;
-    color: #fff;
-}
+        function stopVoiceRecognition() {
+            if (recognition) {
+                recognition.stop();
+            }
+        }
 
-.user {
-    background-color: rgba(50, 205, 50, 0.3);
-    text-align: right;
-    animation: slideInRight 0.5s;
-}
+        function sendQuery() {
+            const query = document.getElementById('user-query').value;
+            const language = document.getElementById('language-select').value;
 
-.bot {
-    background-color: rgba(207, 226, 255, 0.3);
-    animation: slideInLeft 0.5s;
-}
+            fetch('/get_summary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: query, language: language }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const chatLog = document.getElementById('chat-log');
+                    const userMessage = document.createElement('div');
+                    userMessage.classList.add('chat-message', 'user');
+                    userMessage.textContent = query;
+                    chatLog.appendChild(userMessage);
 
-#user-input {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    margin-top: 20px;
-    gap: 10px;
-}
+                    const botMessage = document.createElement('div');
+                    botMessage.classList.add('chat-message', 'bot');
+                    botMessage.innerHTML = `<p>${data.summary}</p>`;
+                    if (data.image_url) {
+                        botMessage.innerHTML += `<img src="${data.image_url}" alt="Image" style="max-width:100%;">`;
+                    }
+                    chatLog.appendChild(botMessage);
+                    chatLog.scrollTop = chatLog.scrollHeight;
 
-#user-query {
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    width: 100%;
-    max-width: 300px;
-}
+                    lastResponse = data.summary;
+                    lastLanguage = language;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
 
-#language-select {
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-}
+        function readOutLastResponse() {
+            if (lastResponse && 'speechSynthesis' in window && !isSpeaking) {
+                const utterance = new SpeechSynthesisUtterance(lastResponse);
+                utterance.lang = document.getElementById('language-select').value;
+                utterance.onstart = function () {
+                    isSpeaking = true;
+                };
+                utterance.onend = function () {
+                    isSpeaking = false;
+                };
+                speechSynthesis.speak(utterance);
+            }
+        }
 
-button {
-    padding: 10px 20px;
-    background-color: #32CD32;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.3s ease;
-}
+        function stopReading() {
+            if (isSpeaking && 'speechSynthesis' in window) {
+                speechSynthesis.cancel();
+                isSpeaking = false;
+            }
+        }
+    </script>
+</body>
 
-button:hover {
-    background-color: #28a745;
-    transform: scale(1.1);
-}
-
-#tts-toggle,
-#voice-toggle {
-    background-color: #32CD32;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    padding: 10px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.3s ease;
-}
-
-#tts-toggle:hover,
-#voice-toggle:hover {
-    background-color: #28a745;
-    transform: scale(1.1);
-}
-
-#user-input label {
-    margin-left: 10px;
-    color: #fff;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes slideInRight {
-    from {
-        transform: translateX(100%);
-    }
-
-    to {
-        transform: translateX(0);
-    }
-}
-
-@keyframes slideInLeft {
-    from {
-        transform: translateX(-100%);
-    }
-
-    to {
-        transform: translateX(0);
-    }
-}
+</html>
